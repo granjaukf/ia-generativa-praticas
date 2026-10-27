@@ -1,0 +1,847 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>RAG e engenharia de contexto</title>
+<meta name="pl7:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: guia de estudo com índice lateral fixo (desktop) e secções numeradas pela ordem do pipeline RAG */
+:root{
+  --bg:#F7F8F5; --surface:#FFFFFF; --sunk:#E9ECE7; --ink:#111111; --muted:#4C5566; --line:#DADFD5; --cell:#E4E6E4;
+  --accent:#3F562A; --accent-soft:#ECF3E6; --kicker:#4E7A3A; --warm:#9A6A1F; --warm-soft:#F5EBD8; --good:#4E7A3A; --bad:#A4432F;
+  --c1:#3F562A; --c2:#7EAB55; --c3:#4C5566; --c4:#85917A; --c5:#9A6A1F; --c6:#2F6B66;
+  --serif:'DM Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --sans:'DM Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --mono:'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12160F; --surface:#1A2016; --sunk:#232B1E; --ink:#ECEFE8; --muted:#A7B0A0; --line:#323C2B; --cell:#2B3326;
+  --accent:#9CC77A; --accent-soft:#26331C; --kicker:#9CC77A; --warm:#D9A24E; --warm-soft:#3A2E17; --good:#8DC46A; --bad:#E07A68;
+  --c1:#A9CF86; --c2:#5F8F3F; --c3:#9AA6BA; --c4:#B5BFA9; --c5:#D9A24E; --c6:#6FB3AE; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12160F; --surface:#1A2016; --sunk:#232B1E; --ink:#ECEFE8; --muted:#A7B0A0; --line:#323C2B; --cell:#2B3326;
+  --accent:#9CC77A; --accent-soft:#26331C; --kicker:#9CC77A; --warm:#D9A24E; --warm-soft:#3A2E17; --good:#8DC46A; --bad:#E07A68;
+  --c1:#A9CF86; --c2:#5F8F3F; --c3:#9AA6BA; --c4:#B5BFA9; --c5:#D9A24E; --c6:#6FB3AE; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16.5px;line-height:1.6;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-block:40px 80px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:24px}}
+nav.toc{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 24px);align-self:start;font-size:14px}
+nav.toc p{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
+nav.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;counter-reset:t}
+nav.toc a{display:flex;gap:10px;padding:5px 8px;border-radius:6px;color:var(--ink);text-decoration:none}
+nav.toc a span{font-family:var(--mono);color:var(--muted);font-size:12.5px;min-width:20px;padding-top:1px}
+nav.toc a:hover,nav.toc a:focus-visible{background:var(--sunk)}
+@media (max-width:900px){nav.toc{position:static}nav.toc ol{flex-direction:row;flex-wrap:wrap}nav.toc a{background:var(--surface);border:1px solid var(--line)}}
+main{min-width:0;display:flex;flex-direction:column;gap:72px}
+header.hero{display:flex;flex-direction:column;gap:14px;max-width:760px}
+.eyebrow{font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--kicker);font-weight:700;margin:0}
+h1{font-family:var(--serif);font-weight:700;letter-spacing:-.02em;font-size:clamp(34px,5vw,52px);line-height:1.08;margin:0;text-wrap:balance}
+h2{font-family:var(--serif);font-weight:500;letter-spacing:-.015em;font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:0;text-wrap:balance;display:flex;gap:14px;align-items:baseline}
+h2 .n{font-family:var(--mono);font-size:15px;color:var(--accent);font-weight:500}
+h3{font-size:17px;margin:0;font-weight:600}
+p{margin:0;max-width:68ch}
+.lead{font-size:19px;color:var(--muted);max-width:62ch}
+section{display:flex;flex-direction:column;gap:20px;scroll-margin-top:24px}
+.prose{display:flex;flex-direction:column;gap:14px}
+code,.mono{font-family:var(--mono);font-size:.92em}
+.formula{font-family:var(--mono);background:var(--sunk);border-radius:8px;padding:14px 18px;overflow-x:auto;white-space:nowrap;font-size:15px}
+.idea{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.idea b.tag{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--kicker)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.grid3.rrf{grid-template-columns:1fr 1fr 1.4fr}
+@media (max-width:760px){.grid3,.grid3.rrf{grid-template-columns:minmax(0,1fr)}}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.grid2,.grid4{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card .k{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.lab{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.lab-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.lab-h .eyebrow{color:var(--kicker)}
+.controls{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center}
+.ctl{display:flex;flex-direction:column;gap:4px;font-size:14px;min-width:170px;flex:1}
+.ctl label{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+.ctl label output{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+button.chip,.seg button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+button.chip:hover,.seg button:hover{border-color:var(--accent)}
+button.chip[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.stat{display:flex;gap:28px;flex-wrap:wrap}
+.stat div{display:flex;flex-direction:column}
+.stat b{font-family:var(--mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.note{font-size:14px;color:var(--muted)}
+.scroll{overflow-x:auto}
+svg text{font-family:var(--sans)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.tok{display:inline-block;font-family:var(--mono);font-size:13.5px;padding:2px 8px;border-radius:6px;background:var(--accent-soft);margin:2px}
+.tok.off{background:transparent;color:var(--muted);text-decoration:line-through}
+.pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.pipe .st{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.pipe .st b{font-size:14.5px}
+.pipe .st span{color:var(--muted);font-size:13px}
+.pipe .ar{align-self:center;color:var(--muted);font-family:var(--mono)}
+.chunk{border-radius:8px;padding:10px 12px;font-size:14px;border-left:4px solid var(--c1);background:var(--sunk);display:flex;flex-direction:column;gap:6px}
+.chunk .meta{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.flag{font-family:var(--mono);font-size:11.5px;padding:1px 7px;border-radius:999px;background:var(--warm-soft);color:var(--warm)}
+.flag.ok{background:var(--accent-soft);color:var(--accent)}
+.ranklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ranklist li{display:flex;gap:10px;align-items:center}
+.ranklist button{flex:1;text-align:left;font:inherit;font-size:14.5px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.ranklist button[aria-pressed="true"]{border-color:var(--good);background:color-mix(in srgb, var(--good) 14%, var(--surface))}
+.ranklist .r{font-family:var(--mono);color:var(--muted);width:26px;text-align:right}
+.ranklist.cut li.below{opacity:.45}
+.doc{font-family:var(--mono);font-size:13.5px;line-height:1.55;background:var(--sunk);border-radius:10px;padding:14px 16px;white-space:pre-wrap;overflow-x:auto}
+.doc .t{color:var(--accent)} .doc .a{color:var(--warm)} .doc .q{color:var(--good)}
+.versions{display:flex;flex-direction:column;gap:8px}
+.ver{display:flex;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:14.5px}
+.ver .d{font-family:var(--mono);font-size:12.5px;color:var(--muted);min-width:88px}
+.ver.out{opacity:.4;text-decoration:line-through}
+.matrix{display:grid;grid-template-columns:auto repeat(2,minmax(0,1fr));gap:8px;font-size:14.5px}
+.matrix .hd{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;align-self:end}
+.matrix button.cell{font:inherit;text-align:left;color:var(--ink);cursor:pointer}
+.matrix .cell{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.matrix .cell.g{border-color:var(--good)} .matrix .cell.b{border-color:var(--bad)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+footer{border-top:1px solid var(--line);padding-top:24px;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
+footer ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+a{color:var(--accent)}
+dl.gl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 18px;margin:0;font-size:14.5px}
+dl.gl dt{font-family:var(--mono);font-weight:500}
+dl.gl dd{margin:0;color:var(--muted)}
+@media (max-width:560px){dl.gl{grid-template-columns:minmax(0,1fr)} dl.gl dd{margin-bottom:8px}}
+.mrr-sys{display:flex;flex-direction:column;gap:10px;background:var(--sunk);border-radius:12px;padding:14px 16px;min-width:0}
+.mrr-sys h3{font-size:15px}
+.mrr-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;font-size:14px}
+.cells{display:flex;gap:3px}
+.cells i{width:28px;height:28px;border-radius:3px;background:var(--cell);display:grid;place-items:center;font-style:normal;font-family:var(--mono);font-size:12px;color:var(--muted);transition:background .2s}
+.cells i.hit{background:var(--c4);color:#fff}
+.cells i.hit.first{background:var(--accent);color:var(--surface)}
+.cells.none i{opacity:.55}
+@media (max-width:560px){.mrr-row{grid-template-columns:minmax(0,1fr)}}
+#mrr-lab th.num{text-align:right}
+#mrr-lab td.num{white-space:nowrap}
+td.pend{color:var(--muted);opacity:.55}
+.mrr-say{background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:15px;max-width:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Índice">
+  <p>Índice</p>
+  <ol>
+    <li><a href="#rag"><span>00</span>O que é RAG</a></li>
+    <li><a href="#janela"><span>01</span>A janela de contexto</a></li>
+    <li><a href="#posicao"><span>02</span>Posição e prompt</a></li>
+    <li><a href="#chunking"><span>03</span>Chunking</a></li>
+    <li><a href="#denso"><span>04</span>Pesquisa densa</a></li>
+    <li><a href="#metricas"><span>05</span>Métricas</a></li>
+    <li><a href="#bm25"><span>06</span>BM25</a></li>
+    <li><a href="#hibrido"><span>07</span>Pesquisa híbrida</a></li>
+    <li><a href="#rerank"><span>08</span>Reranking</a></li>
+    <li><a href="#geracao"><span>09</span>Geração fundamentada</a></li>
+    <li><a href="#avaliacao"><span>10</span>Avaliação</a></li>
+    <li><a href="#alem"><span>11</span>Para lá do básico</a></li>
+    <li><a href="#glossario"><span>—</span>Glossário</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">MIA 26/27 · IA Generativa · Base teórica para a PL7</p>
+  <h1>RAG e engenharia de contexto</h1>
+  <p class="lead">Imagina que tens um assistente virtual que responde a perguntas sobre o funcionamento de um ginásio municipal fictício.</p>
+<p class="lead">As pessoas podem perguntar: <br/>
+- Qual é o horário de funcionamento? <br/>
+- É necessário pagar para utilizar os balneários? <br/>
+- Posso cancelar a minha inscrição? <br/>
+- Existem descontos para pessoas com mais de 65 anos? <br/></p>
+<p class="lead">O assistente deve responder com base no regulamento oficial do ginásio, e não inventar respostas ou utilizar informações de outros estabelecimentos.</p>
+  <p class="lead">O problema é que o modelo de linguagem nem sempre conhece esse regulamento. Um modelo de linguagem só sabe o que viu no treino e o que lhe colocamos à frente no momento da pergunta. É aqui que entram dois conceitos fundamentais: RAG e engenharia de contexto.</p>
+</header>
+
+<!-- 00 -->
+<section id="rag">
+  <h2><span class="n">00</span>O que é RAG</h2>
+  <div class="prose">
+    <p><b>RAG</b> (<i>Retrieval-Augmented Generation</i>, geração aumentada por recuperação) junta duas peças: um <b>recuperador</b>, que procura os excertos relevantes numa coleção de documentos, e um <b>gerador</b>, o LLM, que escreve a resposta apoiando-se nesses excertos. É como um exame com consulta: o aluno não precisa de saber tudo de cor, precisa de saber encontrar a página certa e de a citar. A grande vantagem é que o sistema não precisa de conhecer antecipadamente todos os detalhes do regulamento. Pode consultar os documentos no momento em que recebe a pergunta.</p>
+    <p>Porque não pôr simplesmente todos os documentos no prompt? Porque a janela de contexto é limitada, cada token custa tempo e dinheiro, e um contexto cheio de material irrelevante distrai o modelo. RAG é, no fundo, uma forma de <b>selecionar</b> o contexto.</p>
+  </div>
+  <p><b>Como funciona o processo completo?</b></p>
+  <div class="pipe" aria-label="Pipeline RAG">
+    <div class="st"><b>Documentos</b><span>regulamentos, FAQ, fichas</span></div><div class="ar">→</div>
+    <div class="st"><b>Chunking</b><span>partir em excertos</span></div><div class="ar">→</div>
+    <div class="st"><b>Indexação</b><span>vetores e/ou índice de termos</span></div><div class="ar">→</div>
+    <div class="st"><b>Recuperação</b><span>top-k excertos</span></div><div class="ar">→</div>
+    <div class="st"><b>Reranking e filtros</b><span>reordenar, limpar</span></div><div class="ar">→</div>
+    <div class="st"><b>Prompt e LLM</b><span>resposta com citações</span></div>
+  </div>
+  <p class="note">Este conjunto de etapas constitui o processo de RAG apresentado no documento.</p>
+</section>
+
+<!-- 01 -->
+<section id="janela">
+  <h2><span class="n">01</span>A janela de contexto é um orçamento</h2>
+  <div class="prose">
+    <p>Antes de aprofundarmos as técnicas de pesquisa, precisamos de compreender o que é o contexto. O contexto é toda a informação que o modelo recebe para responder a uma pergunta. Pode incluir: <br/>
+- As instruções que lhe dizem como deve responder. <br/>
+- As mensagens anteriores da conversa. <br/>
+- Os documentos encontrados pelo sistema. <br/>
+- A pergunta que a pessoa acabou de fazer.</p>
+<p>Imagina que o modelo tem uma secretária com espaço limitado.
+Em cima dessa secretária pode colocar o regulamento, as instruções de trabalho, as notas de uma conversa anterior e a pergunta que tem de responder.
+Se colocar demasiados documentos em cima da secretária, pode ficar sem espaço. Além disso, encontrar a informação importante no meio de muitos papéis torna-se mais difícil.
+A janela de contexto funciona de forma semelhante: representa a quantidade de informação que o modelo consegue receber e utilizar numa determinada interação.
+Essa informação é medida em tokens.</p>
+    <p>Tudo o que o modelo recebe num pedido ocupa tokens da mesma janela. Num assistente ingénuo, a pergunta do utilizador acaba por ser uma fração minúscula do que é enviado. <b>Engenharia de contexto</b> é decidir, a cada passo, o que entra nessa janela.</p>
+  </div>
+
+  <div class="lab" id="lab-budget">
+    <div class="lab-h"><p class="eyebrow">Experimenta · orçamento de tokens</p><p class="note">Valores por item ilustrativos</p></div>
+    <div class="controls">
+      <div class="ctl"><label for="b-tools">Ferramentas <output id="o-tools"></output></label><input id="b-tools" type="range" min="0" max="40" value="30"></div>
+      <div class="ctl"><label for="b-hist">Mensagens de histórico <output id="o-hist"></output></label><input id="b-hist" type="range" min="0" max="60" value="40"></div>
+      <div class="ctl"><label for="b-docs">Documentos <output id="o-docs"></output></label><input id="b-docs" type="range" min="0" max="25" value="18"></div>
+    </div>
+    <div class="scroll"><svg id="budget-svg" viewBox="0 0 720 96" width="100%" role="img" aria-label="Barra de distribuição de tokens por componente"></svg></div>
+    <div class="legend" id="budget-legend"></div>
+    <div class="stat">
+      <div><b id="b-total">0</b><span>tokens no total</span></div>
+      <div><b id="b-share">0%</b><span>da janela é a pergunta</span></div>
+      <div><b id="b-cost">0</b><span>tokens por 1 000 pedidos (milhões)</span></div>
+    </div>
+    <p class="note">Assume ~95 tokens por definição de ferramenta, ~48 por mensagem, ~90 por documento curto, 250 de instruções e 17 de pergunta.</p>
+  </div>
+
+  <p>Há quatro estratégias clássicas para gerir este orçamento:</p>
+  <div class="grid4">
+    <div class="card"><span class="k">write</span><h3>Escrever</h3><p class="note">Guardar informação fora da janela (notas, memória, ficheiros) e trazê-la só quando é precisa.</p></div>
+    <div class="card"><span class="k">select</span><h3>Selecionar</h3><p class="note">Incluir só o relevante: os documentos certos, as ferramentas que a tarefa usa.</p></div>
+    <div class="card"><span class="k">compress</span><h3>Comprimir</h3><p class="note">Resumir ou cortar: o histórico antigo, instruções repetidas, documentos longos.</p></div>
+    <div class="card"><span class="k">isolate</span><h3>Isolar</h3><p class="note">Separar contextos: um subagente faz uma tarefa com a sua própria janela e devolve só o resultado.</p></div>
+  </div>
+  
+  <div class="idea"><b class="tag">Modos de falha a reconhecer</b>
+    <p><b>Distração</b>: material irrelevante desvia a atenção. <b>Confusão</b>: ferramentas ou instruções a mais levam a escolhas erradas. <b>Choque</b> (<i>clash</i>): duas fontes contradizem-se, por exemplo duas versões do mesmo regulamento. <b>Envenenamento</b>: um erro entra no contexto e é repetido daí em diante.</p>
+  </div>
+  <p>O objetivo é simples: dar à Inteligência Artificial informação suficiente para responder bem, sem a sobrecarregar com conteúdo desnecessário.</p>
+</section>
+
+<!-- 02 -->
+<section id="posicao">
+  <h2><span class="n">02</span>A posição conta, e a forma do prompt também</h2>
+  <div class="prose">
+    <p>Os modelos não usam o contexto de forma uniforme. Em contextos longos, a informação no <b>início</b> e no <b>fim</b> tende a ser usada melhor do que a que fica <b>no meio</b>: o efeito <i>lost in the middle</i> (Liu et al., 2024). Em contextos curtos e com modelos fortes, o efeito pode quase desaparecer, por isso medi-lo exige contextos longos e muitas perguntas.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · onde está a agulha?</p><p class="note">Curvas esquemáticas, não são dados medidos</p></div>
+    <div class="controls">
+      <div class="ctl"><label for="needle">Posição do documento relevante <output id="o-needle"></output></label><input id="needle" type="range" min="0" max="100" value="50"></div>
+    </div>
+    <div class="scroll"><svg id="lim-svg" viewBox="0 0 720 260" width="100%" role="img" aria-label="Exatidão em função da posição do documento relevante, para contexto curto e longo"></svg></div>
+    <div class="legend"><span><i style="background:var(--c1)"></i>Contexto curto (~2 mil tokens)</span><span><i style="background:var(--c2)"></i>Contexto longo (~30 mil tokens)</span></div>
+  </div>
+
+  <div class="prose">
+    <p>Um prompt para RAG deve deixar claro <b>o que é documento e o que é pergunta</b>, e dar ao modelo os metadados de que ele precisa para decidir: identificador (para citar), título e data (para escolher a versão mais recente). Uma ordem comum é: instruções no sistema, documentos primeiro, pergunta no fim.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Compara · dois prompts para a mesma pergunta</p>
+      <div class="seg" role="group" aria-label="Tipo de prompt"><button id="p-naive" aria-pressed="false">Ingénuo</button><button id="p-struct" aria-pressed="true">Estruturado</button></div></div>
+    <div class="doc" id="prompt-box"></div>
+    <p class="note" id="prompt-note"></p>
+  </div>
+</section>
+
+<!-- 03 -->
+<section id="chunking">
+  <h2><span class="n">03</span>Chunking · partir os documentos em excertos</h2>
+  <div class="prose">
+    <p>Imagina que o regulamento do ginásio tem 80 páginas. Se uma pessoa perguntar como cancelar uma inscrição, não precisamos de enviar as 80 páginas ao modelo.
+Podemos dividir o regulamento em excertos mais pequenos e procurar apenas aquele que explica o cancelamento.
+A este processo chama-se <b>chunking</b>, ou <b>divisão em excertos</b>.</p>
+    <p>O recuperador devolve excertos, não documentos inteiros. Se o excerto for grande demais, traz ruído; se for pequeno demais, perde o contexto que lhe dá sentido. Há duas famílias de estratégias:</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><span class="k">tamanho fixo</span><h3>Janelas de N palavras</h3><p class="note">Simples e uniforme. Mas tem uma desvantagem: pode separar frases ou assuntos que deveriam permanecer juntos. Uma sobreposição entre janelas evita cortar uma frase ao meio, mas os cortes ignoram a estrutura do texto.</p></div>
+    <div class="card"><span class="k">consciente da estrutura</span><h3>Um excerto por unidade lógica</h3><p class="note">Por artigo, secção ou pergunta de FAQ. Cada excerto ganha um título descritivo (cabeçalho contextual) e um identificador estável para citar.</p></div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · Regulamento do Ginásio Municipal (fictício)</p>
+      <div class="seg" role="group" aria-label="Estratégia"><button id="c-fixed" aria-pressed="true">Tamanho fixo</button><button id="c-art" aria-pressed="false">Por artigo</button></div></div>
+    <div class="controls" id="c-ctls">
+      <div class="ctl"><label for="c-size">Tamanho (palavras) <output id="o-size"></output></label><input id="c-size" type="range" min="15" max="80" step="5" value="40"></div>
+      <div class="ctl"><label for="c-ov">Sobreposição (palavras) <output id="o-ov"></output></label><input id="c-ov" type="range" min="0" max="20" step="5" value="10"></div>
+    </div>
+    <div class="stat"><div><b id="c-n">0</b><span>excertos</span></div><div><b id="c-mix">0</b><span>misturam dois artigos</span></div><div><b id="c-mid">0</b><span>começam a meio de um artigo</span></div></div>
+    <div id="c-out" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+  <p><b>Qual é a melhor estratégia?</b> Depende do documento.</p>
+<div class="grid2">
+  <div>
+    <h3>Divisão por tamanho</h3>
+    <p>- É simples de implementar. <br/>
+      - Pode separar informações relacionadas. <br/>
+      - É útil em textos sem uma estrutura clara.</p>
+  </div>
+  <div>
+    <h3>Divisão por assunto</h3>
+    <p>- Respeita melhor a estrutura do documento. <br/>
+      - Ajuda a manter a informação contextualizada. <br/>
+      - É especialmente útil em regulamentos, relatórios e perguntas frequentes bem organizados.</p>
+  </div>
+</div>
+<p>A regra fundamental é encontrar um equilíbrio: os excertos não devem ser tão grandes que contenham muita informação desnecessária, nem tão pequenos que percam o significado.</p>
+</section>
+
+<!-- 04 -->
+<section id="denso">
+  <h2><span class="n">04</span>Pesquisa densa · significado como geometria</h2>
+  <div class="prose">
+    <p>Depois de dividirmos os documentos, precisamos de criar um mecanismo que permita encontrar rapidamente a informação relevante. Imagina uma biblioteca com milhares de livros. Não queremos percorrer todas as páginas sempre que alguém faz uma pergunta. Precisamos de um sistema de pesquisa.</p>
+    <p>Um modelo de <b>embeddings</b> transforma cada texto num vetor de algumas centenas de números. Textos com significado parecido ficam com vetores a apontar em direções parecidas. Para pesquisar, transformamos a pergunta num vetor e procuramos os excertos com maior <b>semelhança de cosseno</b>.</p>
+    <div class="formula">cos(q, d) = (q · d) / (‖q‖ ‖d‖) &nbsp;&nbsp;→&nbsp;&nbsp; com vetores normalizados, é só o produto interno q · d</div>
+    <p>Na prática os vetores têm centenas de dimensões. No círculo abaixo usamos duas, para se perceber a ideia: a semelhança é o cosseno do ângulo entre a seta da pergunta e cada documento.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · escolhe uma pergunta</p></div>
+    <div class="seg" role="group" aria-label="Perguntas de exemplo" id="q-presets"></div>
+    <div class="grid2" style="align-items:start">
+      <svg id="emb-svg" viewBox="-170 -170 340 340" width="100%" style="max-width:380px;touch-action:none;cursor:grab" role="img" aria-label="Círculo de embeddings com documentos e a pergunta"></svg>
+      <div style="min-width:0"><table id="emb-table"><thead><tr><th>#</th><th>Documento</th><th style="text-align:right">cos</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="idea"><b class="tag">Bi-encoder</b><p>Pergunta e documentos são codificados <b>separadamente</b>. Os vetores dos documentos calculam-se uma vez e guardam-se; cada pesquisa custa só codificar a pergunta e fazer produtos internos. Rápido, mas a pergunta e o documento nunca “se veem” um ao outro.</p></div>
+    <div class="idea"><b class="tag">Lê o model card</b><p> O model card ajuda-te a conhecer as características e limitações de um modelo antes de o utilizares. Alguns modelos foram treinados de forma <b>assimétrica</b>: esperam um prefixo diferente para perguntas e para documentos (por exemplo, a família E5 usa <code>query:</code> e <code>passage:</code>). Usar o modelo sem respeitar o formato do treino é usá-lo fora das condições em que foi avaliado. Escolher um modelo <b>multilingue</b> é essencial para textos em português.</p></div>
+  </div>
+  <p class="note"><b>Ponto fraco típico:</b> palavras exatas e raras (códigos, siglas, números de artigo ou expressões muito específicas) nem sempre ficam bem representadas num vetor de significado. Por exemplo, se a pessoa perguntar pelo artigo «UC-4471», pode ser mais eficaz procurar diretamente esse código do que depender apenas da semelhança de significado.
+    <br/><b>Ponto forte:</b> consegue encontrar informação relevante mesmo quando o utilizador não usa exatamente as mesmas palavras do documento, mas só até onde o modelo conhece o vocabulário. </p>
+</section>
+
+<!-- 05 -->
+<section id="metricas">
+  <h2><span class="n">05</span>Métricas de recuperação</h2>
+  <div class="prose">
+    <p>Para comparar recuperadores, precisamos de um <b>conjunto de avaliação</b>: perguntas com os excertos relevantes já identificados à mão. Duas métricas cobrem quase tudo:</p>
+    <div class="formula">Recall@k = |relevantes ∩ top-k| / |relevantes|</div>
+    <div class="formula">RR = 1 / (posição do primeiro relevante) &nbsp;&nbsp;·&nbsp;&nbsp; MRR = média do RR sobre todas as perguntas</div>
+    <p>O <i>Recall@k</i> mede a proporção dos documentos relevantes que aparecem entre os primeiros resultados selecionados. O símbolo <i>k</i> representa o número de resultados que estamos a considerar. O Recall@k diz <b>se</b> os relevantes chegaram ao top-k (importa porque é o top-k que vai para o prompt).</p>
+    <p>O MRR é a sigla de Mean Reciprocal Rank. É uma métrica que avalia a posição em que aparece o primeiro resultado relevante, considerando várias perguntas. O RR diz <b>quão cedo</b> aparece o primeiro (importa porque o modelo dá mais peso ao que vem primeiro e porque k pequeno é mais barato).</p>
+    <p>Enquanto o Recall@k se preocupa com a quantidade de informação relevante encontrada, o RR preocupa-se com a rapidez com que aparece o primeiro resultado relevante.</p>
+    <p>A lógica é simples: não basta encontrar a informação; também é importante encontrá-la rapidamente, entre os primeiros resultados.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · clica nos resultados relevantes</p></div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Valor de k" id="k-seg"></div>
+      <div class="ctl" style="max-width:280px"><label for="m-miss">Relevantes que não foram recuperados <output id="o-miss"></output></label><input id="m-miss" type="range" min="0" max="3" value="0"></div>
+    </div>
+    <div class="grid2" style="align-items:start">
+      <ol class="ranklist cut" id="rank"></ol>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="stat"><div><b id="m-rec">—</b><span id="m-rec-l">Recall@k</span></div><div><b id="m-rr">—</b><span>RR</span></div></div>
+        <p class="note" id="m-explain"></p>
+      </div>
+    </div>
+  </div>
+  <div class="lab" id="mrr-lab">
+    <div class="lab-h"><p class="eyebrow">Exemplo resolvido à mão · MRR passo a passo</p><p class="note">3 perguntas · 2 sistemas · top-5</p></div>
+    <div class="seg" role="group" aria-label="Passo do exemplo" id="mrr-steps"></div>
+    <p class="mrr-say" id="mrr-say" aria-live="polite"></p>
+    <div class="grid2" id="mrr-sys"></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Pergunta</th><th class="num">Posição A</th><th class="num">RR A</th><th class="num">Posição B</th><th class="num">RR B</th></tr></thead>
+      <tbody id="mrr-body"></tbody>
+      <tfoot><tr><th>MRR (média)</th><td class="num" colspan="2" id="mrr-a"></td><td class="num" colspan="2" id="mrr-b"></td></tr>
+             <tr><th>Recall@5</th><td class="num" colspan="2" id="rec-a"></td><td class="num" colspan="2" id="rec-b"></td></tr></tfoot>
+    </table></div>
+    <div class="controls"><button class="chip" id="mrr-fail" aria-pressed="false">E se a Q3 do sistema A falhar por completo?</button></div>
+    <div class="grid2" style="align-items:center">
+      <svg id="rr-svg" viewBox="0 0 420 170" role="img" aria-label="Valor de 1/posição para as posições 1 a 10" style="width:100%;height:auto"></svg>
+      <p class="note">Quanto vale cada posição. Descer do 1.º para o 2.º lugar custa 0,50; descer do 4.º para o 5.º custa só 0,05. O MRR castiga sobretudo quem falha o topo da lista, e uma falha total (RR = 0) pesa mais do que qualquer descida.</p>
+    </div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Atenção ao tamanho da amostra</p></div>
+    <div class="controls"><div class="ctl" style="max-width:360px"><label for="n-q">Perguntas no conjunto de avaliação <output id="o-nq"></output></label><input id="n-q" type="range" min="5" max="200" value="20"></div></div>
+    <p id="nq-text"></p>
+  </div>
+</section>
+
+<!-- 06 -->
+<section id="bm25">
+  <h2><span class="n">06</span>BM25 · pesquisa por palavras, com bom senso</h2>
+  <div class="prose">
+    <p>A pesquisa por significado (dense search)é útil, mas não é a única forma de encontrar informação.</p>
+    <p>O <b>BM25</b> é o herdeiro do TF-IDF <i>(Term Frequency–Inverse Document Frequency)</i> e continua a ser uma referência difícil de bater. Pontua um documento pelas palavras da pergunta que ele contém, com três ideias:</p>
+  </div>
+  <div class="grid3">
+    <div class="card"><span class="k">IDF</span><h3>Palavras raras valem mais</h3><p class="note">“balneário” distingue documentos; “de” não distingue nada.</p></div>
+    <div class="card"><span class="k">saturação · k1</span><h3>Repetir rende cada vez menos</h3><p class="note">Imagina dois documentos: <br/>
+- Doc A: a palavra «pagamento» aparece 2 vezes. <br/>
+- Doc B: a palavra «pagamento» aparece 20 vezes. <br/>
+O documento B não é necessariamente dez vezes mais relevante.</p></div>
+    <div class="card"><span class="k">comprimento · b</span><h3>Documentos longos são penalizados</h3><p class="note">Têm mais palavras só por serem longos, não por serem mais relevantes.</p></div>
+  </div>
+  <div class="formula">score(q, d) = Σ<sub>t∈q</sub> IDF(t) · f(t,d)·(k1+1) / ( f(t,d) + k1·(1 − b + b·|d|/avgdl) )</div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · contribuição de uma palavra em função das ocorrências</p></div>
+    <div class="controls">
+      <div class="ctl"><label for="k1">k1 (saturação) <output id="o-k1"></output></label><input id="k1" type="range" min="0.2" max="3" step="0.1" value="1.5"></div>
+      <div class="ctl"><label for="bb">b (peso do comprimento) <output id="o-b"></output></label><input id="bb" type="range" min="0" max="1" step="0.05" value="0.75"></div>
+      <div class="ctl"><label for="ld">|d| / comprimento médio <output id="o-ld"></output></label><input id="ld" type="range" min="0.25" max="3" step="0.25" value="1"></div>
+    </div>
+    <div class="scroll"><svg id="bm-svg" viewBox="0 0 720 250" width="100%" role="img" aria-label="Curva de saturação do BM25"></svg></div>
+    <div class="legend"><span><i style="background:var(--c1)"></i>BM25 (sem IDF)</span><span><i style="background:var(--muted)"></i>Contagem bruta (TF), para comparar</span></div>
+  </div>
+  <div class="prose"><p>O BM25 é tão bom quanto a <b>tokenização</b>: minúsculas, remoção de acentos, palavras vazias e, idealmente, redução a radicais (<i>stemming</i>), para que “reembolsos” e “reembolso” contem como a mesma palavra. Códigos como <code>uc-4471</code> devem sobreviver inteiros.</p></div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · o que o BM25 “vê”</p></div>
+    <div class="ctl" style="max-width:none"><label for="tk-in">Escreve uma pergunta</label><input id="tk-in" type="text" value="Quais são os horários das aulas de grupo no ginásio?" style="font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)"></div>
+    <div class="seg" role="group" aria-label="Passos de normalização">
+      <button class="chip" id="tk-stop" aria-pressed="true">Remover palavras vazias</button>
+      <button class="chip" id="tk-stem" aria-pressed="false">Radical simples (plural)</button>
+    </div>
+    <div id="tk-out"></div>
+  </div>
+  <p><b>Quando devemos utilizar o BM25?</b> É particularmente útil quando precisamos de encontrar: <br/>
+- Números de artigos de um regulamento. <br/>
+- Códigos específicos. <br/>
+- Siglas. <br/>
+- Palavras exatas. <br/>
+- Expressões que aparecem literalmente nos documentos. <br/>
+Em resumo: a pesquisa densa procura semelhanças de significado; o BM25 procura correspondências entre palavras.</p>
+</section>
+
+<!-- 07 -->
+<section id="hibrido">
+  <h2><span class="n">07</span>Pesquisa híbrida · juntar duas listas com RRF</h2>
+  <div class="prose">
+    <p>Denso e BM25 erram de formas diferentes, por isso é tentador combiná-los. Imaginem que fazemos a mesma pergunta aos dois sistemas.
+O primeiro apresenta uma lista dos documentos que considera mais relevantes. O segundo apresenta outra lista. As pontuações não são comparáveis (cossenos contra somas BM25), mas as <b>posições</b> são. A <b>Reciprocal Rank Fusion</b> soma, para cada documento, o inverso da sua posição em cada lista:</p>
+    <div class="formula">RRF(d) = Σ<sub>listas</sub> 1 / (k + posição(d))  &nbsp;&nbsp;·&nbsp;&nbsp; k = 60 por omissão</div>
+    <p>Imagina que: <br/>
+- Um documento aparece em segundo lugar na pesquisa por significado. <br/>
+- O mesmo documento aparece em terceiro lugar na pesquisa por palavras. <br/>
+- Outro documento aparece em primeiro lugar numa lista, mas não aparece na outra. <br/>
+O primeiro documento pode merecer uma posição elevada na classificação final porque foi considerado relevante pelos dois métodos. A ideia é aproveitar as forças dos dois sistemas.</p>
+    <p><b>Atenção:</b> A fusão só ajuda se as listas forem <b>complementares</b>: se ambas falham no mesmo documento, nenhuma fusão o recupera.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · funde duas listas</p></div>
+    <div class="controls"><div class="ctl" style="max-width:360px"><label for="rrf-k">Constante k <output id="o-rrfk"></output></label><input id="rrf-k" type="range" min="0" max="100" step="5" value="60"></div></div>
+    <div class="grid3 rrf">
+      <div class="card"><span class="k">denso</span><ol id="l-dense" style="margin:0;padding-left:20px"></ol></div>
+      <div class="card"><span class="k">BM25</span><ol id="l-bm" style="margin:0;padding-left:20px"></ol></div>
+      <div class="card"><span class="k">fusão RRF</span><table id="l-rrf"><tbody></tbody></table></div>
+    </div>
+    <p class="note">Com k pequeno, o 1.º lugar de cada lista domina. Com k grande, as diferenças entre posições achatam-se e conta sobretudo estar nas duas listas.</p>
+  </div>
+</section>
+
+<!-- 08 -->
+<section id="rerank">
+  <h2><span class="n">08</span>Reranking · ler pergunta e excerto juntos</h2>
+  <p>Depois da pesquisa, podemos ter uma lista de documentos potencialmente relevantes. Mas será que o primeiro resultado é realmente o melhor? Nem sempre. O reranking, ou reordenação dos resultados, consiste em analisar novamente os documentos encontrados para determinar quais são os mais adequados à pergunta.</p>
+  <div class="grid2">
+    <div class="idea"><b class="tag">Bi-encoder (recuperação)</b><p>Codifica separadamente; compara vetores. Escala para milhões de documentos. Perde nuances, porque nunca lê os dois textos ao mesmo tempo.</p></div>
+    <div class="idea"><b class="tag">Cross-encoder (reranking)</b><p>Recebe o par (pergunta, excerto) <b>de uma vez</b> e devolve uma pontuação de relevância. Muito mais preciso, mas cada par é uma passagem completa pelo modelo: impossível para a coleção toda.</p></div>
+  </div>
+  <div class="prose"><p>Daí o padrão em <b>duas fases</b>: um recuperador barato reduz a coleção a algumas dezenas de candidatos, e o cross-encoder reordena só esses. A segunda fase só pode reordenar o que a primeira trouxe.</p></div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · custo do funil</p></div>
+    <div class="controls">
+      <div class="ctl"><label for="f-n">Candidatos enviados ao reranker <output id="o-fn"></output></label><input id="f-n" type="range" min="5" max="200" step="5" value="30"></div>
+    </div>
+    <div class="scroll"><svg id="funnel-svg" viewBox="0 0 720 150" width="100%" role="img" aria-label="Funil de recuperação em duas fases"></svg></div>
+    <p class="note">Tempos ilustrativos: ~5 ms para a primeira fase e ~3 ms por par no cross-encoder numa GPU. Mais candidatos dão mais hipóteses de apanhar o relevante, mas o custo cresce linearmente.</p>
+  </div>
+</section>
+
+<!-- 09 -->
+<section id="geracao">
+  <h2><span class="n">09</span>Geração fundamentada</h2>
+  <div class="prose"><p>Com os excertos certos na mão, ainda há três coisas a garantir antes e depois de chamar o modelo.</p></div>
+  <div class="grid3">
+    <div class="card"><span class="k">filtros de metadados</span><h3>Resolver versões antes do prompt</h3><p class="note">Se há duas versões do mesmo documento, filtrar pela data é mais barato e mais fiável do que pedir ao modelo que escolha.</p></div>
+    <div class="card"><span class="k">citações</span><h3>Dizer de onde vem cada afirmação</h3><p class="note">Pedir o identificador entre parêntesis retos e verificar depois, em código, se cada id citado foi mesmo recuperado.</p></div>
+    <div class="card"><span class="k">abstenção</span><h3>Saber dizer “não sei”</h3><p class="note">Se a resposta não está nos excertos, o sistema deve recusar em vez de inventar. Uma frase fixa facilita a deteção.</p></div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Experimenta · filtro “só a versão mais recente por tópico”</p>
+      <button class="chip" id="v-btn" aria-pressed="false">Aplicar filtro</button></div>
+    <div class="versions" id="versions"></div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section id="avaliacao">
+  <h2><span class="n">10</span>Avaliar respostas</h2>
+  <div class="prose">
+    <p>Avaliar a recuperação não chega: é preciso avaliar a resposta. Duas propriedades diferentes:</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><span class="k">correção</span><h3>A resposta está certa?</h3><p class="note">Compara com uma resposta de referência. Uma forma barata é verificar se contém uma <b>cadeia-chave</b>; mede um facto, não a resposta toda, e uma chave mal escolhida (comum demais) deixa passar respostas erradas.</p></div>
+    <div class="card"><span class="k">fidelidade</span><h3>Está suportada pelos excertos?</h3><p class="note">Cada afirmação tem de vir do contexto recuperado. Uma resposta pode estar certa por acaso (conhecimento do modelo) e não ser fiel, ou ser fiel a um excerto desatualizado e estar errada.</p></div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Explora · as quatro combinações</p><p class="note">Clica numa célula</p></div>
+    <div class="matrix" id="matrix">
+      <span></span><span class="hd">Fiel aos excertos</span><span class="hd">Não fiel</span>
+      <span class="hd">Correta</span><button class="cell g" data-c="0">Ideal</button><button class="cell b" data-c="1">Certa por sorte</button>
+      <span class="hd">Errada</span><button class="cell b" data-c="2">Recuperação falhou</button><button class="cell b" data-c="3">Alucinação</button>
+    </div>
+    <p id="matrix-text"></p>
+  </div>
+  <div class="idea"><b class="tag">LLM como juiz</b>
+    <p>Um segundo modelo lê os excertos e a resposta e decide se tudo está suportado. Escala bem, mas tem vieses conhecidos: prefere a <b>primeira</b> resposta que lê, prefere respostas <b>longas</b>, prefere o <b>próprio estilo</b>, e modelos pequenos falham o formato pedido ou julgam ao calhas. Um juiz deve ser mais forte do que o sistema avaliado e deve ser calibrado com uma amostra de rótulos humanos. E nada substitui ler algumas respostas.</p>
+  </div>
+</section>
+
+<!-- 11 -->
+<section id="alem">
+  <h2><span class="n">11</span>Para lá do básico</h2>
+  <div class="grid3">
+    <div class="card"><span class="k">query rewriting</span><h3>Reescrever a pergunta</h3><p class="note">Perguntas de seguimento (“e posso pagar de outra forma?”) só fazem sentido com o histórico. Um LLM reescreve-as como perguntas autónomas antes de pesquisar. Também serve para trocar linguagem coloquial pelo vocabulário dos documentos.</p></div>
+    <div class="card"><span class="k">HyDE</span><h3>Pesquisar com uma resposta inventada</h3><p class="note">O LLM escreve uma resposta hipotética e pesquisa-se com o vetor dessa resposta, que “vive” no espaço dos documentos. Ajuda quando o gerador conhece o domínio; custa uma chamada ao LLM por pesquisa.</p></div>
+    <div class="card"><span class="k">contextual retrieval</span><h3>Enriquecer cada excerto</h3><p class="note">Antes de indexar, acrescenta-se a cada excerto uma frase sobre o documento de onde vem. Melhora a recuperação de excertos que, sozinhos, são ambíguos.</p></div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><p class="eyebrow">Um ciclo agêntico mínimo</p></div>
+    <div class="pipe">
+      <div class="st"><b>Pesquisar</b><span>recuperar e reordenar</span></div><div class="ar">→</div>
+      <div class="st"><b>Responder</b><span>com citações</span></div><div class="ar">→</div>
+      <div class="st"><b>Verificar</b><span>juiz ou verificador</span></div><div class="ar">→</div>
+      <div class="st"><b>Se falhar</b><span>reformular e repetir, até N vezes</span></div>
+    </div>
+    <p class="note">O ciclo é tão bom quanto o verificador: um juiz fraco repete respostas certas ou aceita erradas. Cada volta multiplica custo e latência, e cada reformulação pode afastar-se do que o utilizador perguntou.</p>
+  </div>
+</section>
+
+<!-- Glossário -->
+<section id="glossario">
+  <h2><span class="n">—</span>Glossário</h2>
+  <dl class="gl">
+    <dt>RAG</dt><dd>Retrieval-Augmented Generation: geração aumentada por recuperação.</dd>
+    <dt>LLM</dt><dd>Large Language Model: modelo de linguagem de grande dimensão.</dd>
+    <dt>Token</dt><dd>Unidade de texto do modelo (pedaço de palavra); mede custo e ocupação da janela.</dd>
+    <dt>Chunk</dt><dd>Excerto de um documento, a unidade que se indexa e recupera.</dd>
+    <dt>Embedding</dt><dd>Vetor numérico que representa o significado de um texto.</dd>
+    <dt>Bi-encoder</dt><dd>Modelo que codifica pergunta e documento em separado.</dd>
+    <dt>Cross-encoder</dt><dd>Modelo que lê pergunta e documento juntos e dá uma pontuação.</dd>
+    <dt>BM25</dt><dd>Best Matching 25: função de pontuação por termos, com IDF, saturação e normalização pelo comprimento.</dd>
+    <dt>IDF</dt><dd>Inverse Document Frequency: peso maior para termos raros na coleção.</dd>
+    <dt>RRF</dt><dd>Reciprocal Rank Fusion: fusão de listas ordenadas pela soma de 1/(k + posição).</dd>
+    <dt>Recall@k</dt><dd>Fração dos excertos relevantes que aparecem no top-k.</dd>
+    <dt>MRR</dt><dd>Mean Reciprocal Rank: média de 1/posição do primeiro relevante.</dd>
+    <dt>HyDE</dt><dd>Hypothetical Document Embeddings: pesquisar com o vetor de uma resposta hipotética.</dd>
+    <dt>Faithfulness</dt><dd>Fidelidade: a resposta só afirma o que os excertos suportam.</dd>
+  </dl>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;if(parent)parent.appendChild(e);return e;}
+function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
+function press(btns,on){btns.forEach(b=>b.setAttribute("aria-pressed",String(b===on)));}
+
+/* 01 · orçamento */
+(function(){
+  const parts=[["Instruções","var(--c4)",()=>250],["Ferramentas","var(--c1)",()=>95*+$("#b-tools").value],["Histórico","var(--c2)",()=>48*+$("#b-hist").value],["Documentos","var(--c3)",()=>90*+$("#b-docs").value],["Pergunta","var(--c5)",()=>17]];
+  const svg=$("#budget-svg"),lg=$("#budget-legend");
+  lg.innerHTML=parts.map(p=>`<span><i style="background:${p[1]}"></i>${p[0]}</span>`).join("");
+  function draw(){
+    $("#o-tools").textContent=$("#b-tools").value;$("#o-hist").textContent=$("#b-hist").value;$("#o-docs").textContent=$("#b-docs").value;
+    const v=parts.map(p=>p[2]()),tot=v.reduce((a,b)=>a+b,0);
+    clear(svg);let x=0;const W=720;
+    v.forEach((t,i)=>{const w=W*t/tot;if(w<=0)return;el("rect",{x:x,y:10,width:Math.max(w,1),height:44,fill:parts[i][1],rx:3},svg);
+      if(w>58)el("text",{x:x+6,y:37,fill:"var(--surface)","font-size":13,"font-weight":600},svg,Math.round(100*t/tot)+"%");x+=w;});
+    el("text",{x:0,y:80,fill:"var(--muted)","font-size":12},svg,"0");
+    el("text",{x:W,y:80,fill:"var(--muted)","font-size":12,"text-anchor":"end"},svg,tot.toLocaleString("pt-PT")+" tokens");
+    $("#b-total").textContent=tot.toLocaleString("pt-PT");
+    $("#b-share").textContent=(100*17/tot).toFixed(1).replace(".",",")+"%";
+    $("#b-cost").textContent=(tot*1000/1e6).toFixed(1).replace(".",",");
+  }
+  ["#b-tools","#b-hist","#b-docs"].forEach(s=>$(s).addEventListener("input",draw));draw();
+})();
+
+/* 02 · lost in the middle (esquemático) */
+(function(){
+  const svg=$("#lim-svg"),W=720,H=260,L=56,R=20,T=16,B=40;
+  const X=p=>L+p*(W-L-R),Y=a=>T+(1-a)*(H-T-B);
+  const short=p=>0.95*(1-p)+0.94*p-0.03*4*p*(1-p);
+  const long=p=>0.76*(1-p)+0.70*p-0.24*4*p*(1-p);
+  function path(f){let d="";for(let i=0;i<=100;i++){const p=i/100;d+=(i?"L":"M")+X(p).toFixed(1)+" "+Y(f(p)).toFixed(1);}return d;}
+  function draw(){
+    const p=+$("#needle").value/100;$("#o-needle").textContent=p===0?"início":p===1?"fim":Math.round(p*100)+"%";
+    clear(svg);
+    [0,0.25,0.5,0.75,1].forEach(a=>{el("line",{x1:L,x2:W-R,y1:Y(a),y2:Y(a),stroke:"var(--line)"},svg);el("text",{x:L-8,y:Y(a)+4,"text-anchor":"end","font-size":12,fill:"var(--muted)"},svg,Math.round(a*100)+"%");});
+    [["início",0],["meio",0.5],["fim",1]].forEach(([t,v])=>el("text",{x:X(v),y:H-14,"text-anchor":v===0?"start":v===1?"end":"middle","font-size":12,fill:"var(--muted)"},svg,t));
+    el("path",{d:path(short),fill:"none",stroke:"var(--c1)","stroke-width":3},svg);
+    el("path",{d:path(long),fill:"none",stroke:"var(--c2)","stroke-width":3},svg);
+    el("line",{x1:X(p),x2:X(p),y1:T,y2:H-B,stroke:"var(--ink)","stroke-dasharray":"4 4"},svg);
+    [[short,"var(--c1)"],[long,"var(--c2)"]].forEach(([f,c])=>{el("circle",{cx:X(p),cy:Y(f(p)),r:6,fill:c,stroke:"var(--surface)","stroke-width":2},svg);
+      el("text",{x:X(p)+(p>0.8?-10:10),y:Y(f(p))-10,"text-anchor":p>0.8?"end":"start","font-size":13,"font-weight":600,fill:c},svg,Math.round(f(p)*100)+"%");});
+    el("text",{x:L,y:T-2,"font-size":12,fill:"var(--muted)"},svg,"exatidão");
+  }
+  $("#needle").addEventListener("input",draw);draw();
+})();
+
+/* 02 · prompts */
+(function(){
+  const box=$("#prompt-box"),note=$("#prompt-note"),a=$("#p-naive"),b=$("#p-struct");
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  const naive="Contexto: As aulas de grupo decorrem às segundas e quartas, às 19h00. A mensalidade é de 25 euros. A mensalidade é de 28 euros e inclui acesso à piscina.\nPergunta: Quanto custa a mensalidade?";
+  const struct=[["t",'<documents>'],["t",'<doc id="gin-aulas" title="Aulas de grupo" date="2025-09-01">'],["",'As aulas de grupo decorrem às segundas e quartas, às 19h00.'],["t",'</doc>'],["t",'<doc id="gin-precos-2025" title="Preçário 2025" date="2025-01-10">'],["",'A mensalidade é de 25 euros.'],["t",'</doc>'],["t",'<doc id="gin-precos-2026" title="Preçário 2026" date="2026-01-08">'],["",'A mensalidade é de 28 euros e inclui acesso à piscina.'],["t",'</doc>'],["t",'</documents>'],["",""],["q",'<question>'],["q",'Quanto custa a mensalidade?'],["q",'</question>']];
+  function show(s){press([a,b],s?b:a);
+    if(s){box.innerHTML=struct.map(([c,t])=>c?`<span class="${c}">${esc(t)}</span>`:esc(t)).join("\n");
+      note.textContent="Cada excerto tem id (para citar), título e data (para escolher a versão mais recente). Os documentos vêm primeiro e a pergunta no fim. As instruções (citar, abster-se, preferir o mais recente) vão no prompt de sistema.";}
+    else{box.textContent=naive;note.textContent="Os textos estão colados uns aos outros: o modelo não sabe onde acaba cada documento, de quando é cada preço, nem como citar a fonte.";}}
+  a.addEventListener("click",()=>show(false));b.addEventListener("click",()=>show(true));show(true);
+})();
+
+/* 03 · chunking */
+(function(){
+  const REG=[["Artigo 1.º – Objeto","O presente regulamento define as regras de utilização do Ginásio Municipal de Vila Serena, incluindo a sala de musculação, as aulas de grupo e a piscina."],
+  ["Artigo 2.º – Inscrição","A inscrição é feita na receção ou no portal municipal, mediante apresentação de documento de identificação. Menores de dezasseis anos precisam de autorização do encarregado de educação."],
+  ["Artigo 3.º – Mensalidades","A mensalidade é paga até ao dia oito de cada mês. O atraso superior a trinta dias suspende o acesso às instalações até à regularização."],
+  ["Artigo 4.º – Aulas de grupo","As aulas de grupo exigem marcação prévia com pelo menos duas horas de antecedência. Três faltas sem aviso no mesmo mês impedem novas marcações durante uma semana."],
+  ["Artigo 5.º – Balneários","É obrigatório o uso de chinelos nos balneários. Os cacifos são esvaziados diariamente às vinte e duas horas."],
+  ["Artigo 6.º – Cancelamento","O utente pode cancelar a inscrição a qualquer momento, com aviso prévio de quinze dias. Não há reembolso de mensalidades já pagas."]];
+  const words=[];const startIdx=[];
+  REG.forEach(([h,t],i)=>{startIdx.push(words.length);(h+" "+t).split(/\s+/).forEach(w=>words.push({w,a:i}));});
+  const out=$("#c-out"),bf=$("#c-fixed"),ba=$("#c-art"),ctls=$("#c-ctls");let mode="fixed";
+  const cols=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)"];
+  function render(chunks){clear(out);let mix=0,mid=0;
+    chunks.forEach((c,i)=>{const arts=[...new Set(c.map(x=>x.a))];const m=arts.length>1;const s=c.length&&!startIdx.includes(words.indexOf(c[0]));
+      if(m)mix++;if(s)mid++;
+      const d=document.createElement("div");d.className="chunk";d.style.borderLeftColor=cols[i%cols.length];
+      const meta=document.createElement("div");meta.className="meta";
+      meta.innerHTML=`<span>excerto ${i+1}</span><span>${c.length} palavras</span>`+(m?'<span class="flag">mistura artigos</span>':"")+(s?'<span class="flag">começa a meio</span>':"")+(!m&&!s?'<span class="flag ok">um só artigo</span>':"");
+      const p=document.createElement("p");p.textContent=c.map(x=>x.w).join(" ");d.append(meta,p);out.appendChild(d);});
+    $("#c-n").textContent=chunks.length;$("#c-mix").textContent=mix;$("#c-mid").textContent=mid;}
+  function draw(){
+    $("#o-size").textContent=$("#c-size").value;
+    const size=+$("#c-size").value;let ov=Math.min(+$("#c-ov").value,size-5);$("#o-ov").textContent=ov;
+    if(mode==="art"){ctls.hidden=true;render(REG.map((_,i)=>words.filter(x=>x.a===i)));return;}
+    ctls.hidden=false;const step=size-ov,ch=[];
+    for(let i=0;i<words.length;i+=step){ch.push(words.slice(i,i+size).map((x,j)=>x));if(i+size>=words.length)break;}
+    // marcar posições reais para "começa a meio"
+    render(ch);
+  }
+  bf.addEventListener("click",()=>{mode="fixed";press([bf,ba],bf);draw();});
+  ba.addEventListener("click",()=>{mode="art";press([bf,ba],ba);draw();});
+  ["#c-size","#c-ov"].forEach(s=>$(s).addEventListener("input",draw));draw();
+})();
+
+/* 04 · embeddings no círculo */
+(function(){
+  const svg=$("#emb-svg"),tb=$("#emb-table tbody"),R=130;
+  const docs=[["Preço da mensalidade",20],["Pagamento em prestações",42],["Desconto para estudantes",65],["Cancelamento da inscrição",110],["Reembolso de quotas",132],["Horário das aulas de grupo",200],["Marcação de aulas",222],["Regras do balneário",290],["Cacifos e perdidos e achados",315]];
+  const presets=[["Quanto pago por mês?",28],["Posso desistir e receber o dinheiro?",122],["A que horas é o pilates?",208],["Onde guardo a mochila?",305]];
+  let qa=28;
+  const seg=$("#q-presets");const btns=presets.map(([t,a])=>{const b=document.createElement("button");b.className="chip";b.textContent=t;b.addEventListener("click",()=>{qa=a;press(btns,b);draw();});seg.appendChild(b);return b;});
+  press(btns,btns[0]);
+  const P=a=>[R*Math.cos(a*Math.PI/180),-R*Math.sin(a*Math.PI/180)];
+  function draw(){clear(svg);
+    el("circle",{cx:0,cy:0,r:R,fill:"none",stroke:"var(--line)","stroke-width":1.5},svg);
+    const sims=docs.map(([n,a])=>({n,a,s:Math.cos((a-qa)*Math.PI/180)})).sort((x,y)=>y.s-x.s);
+    const top=new Set(sims.slice(0,3).map(x=>x.n));
+    docs.forEach(([n,a])=>{const [x,y]=P(a);const t=top.has(n);
+      if(t)el("line",{x1:0,y1:0,x2:x,y2:y,stroke:"var(--c3)","stroke-width":1.5,"stroke-dasharray":"3 3"},svg);
+      el("circle",{cx:x,cy:y,r:t?7:5,fill:t?"var(--c3)":"var(--muted)"},svg);});
+    const [qx,qy]=P(qa);
+    el("line",{x1:0,y1:0,x2:qx,y2:qy,stroke:"var(--accent)","stroke-width":3},svg);
+    el("circle",{cx:qx,cy:qy,r:10,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":3},svg);
+    el("circle",{cx:0,cy:0,r:3,fill:"var(--muted)"},svg);
+    tb.innerHTML=sims.map((d,i)=>`<tr><td class="num">${i+1}</td><td>${top.has(d.n)?"<b>"+d.n+"</b>":d.n}</td><td class="num">${d.s.toFixed(2).replace(".",",")}</td></tr>`).join("");
+  }
+  let drag=false;
+  function setFrom(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;const m=svg.getScreenCTM();if(!m)return;const p=pt.matrixTransform(m.inverse());
+    qa=(Math.atan2(-p.y,p.x)*180/Math.PI+360)%360;press(btns,null);draw();}
+  svg.addEventListener("pointerdown",e=>{drag=true;svg.setPointerCapture(e.pointerId);setFrom(e);});
+  svg.addEventListener("pointermove",e=>{if(drag)setFrom(e);});
+  svg.addEventListener("pointerup",()=>{drag=false;});
+  draw();
+})();
+
+/* 05 · métricas */
+(function(){
+  const items=["Art. 4.º Aulas de grupo","Preçário 2026","Art. 2.º Inscrição","Horários da piscina","Art. 6.º Cancelamento","Contactos da receção","Art. 3.º Mensalidades","Preçário 2025"];
+  const rel=new Set([2,4]);let k=3;
+  const ol=$("#rank"),seg=$("#k-seg");
+  const kb=[1,3,5].map(v=>{const b=document.createElement("button");b.textContent="k = "+v;b.addEventListener("click",()=>{k=v;press(kb,b);draw();});seg.appendChild(b);return b;});press(kb,kb[1]);
+  function draw(){
+    const miss=+$("#m-miss").value;$("#o-miss").textContent=miss;
+    ol.innerHTML="";items.forEach((t,i)=>{const li=document.createElement("li");if(i>=k)li.className="below";
+      li.innerHTML=`<span class="r">${i+1}</span>`;const b=document.createElement("button");b.setAttribute("aria-pressed",String(rel.has(i)));
+      b.innerHTML=`<span>${t}</span><span class="note">${rel.has(i)?"relevante":""}</span>`;b.addEventListener("click",()=>{rel.has(i)?rel.delete(i):rel.add(i);draw();});li.append(b);ol.append(li);});
+    const total=rel.size+miss;const inK=[...rel].filter(i=>i<k).length;const first=[...rel].sort((a,b)=>a-b)[0];
+    $("#m-rec-l").textContent="Recall@"+k;
+    $("#m-rec").textContent=total?(inK/total).toFixed(2).replace(".",","):"—";
+    $("#m-rr").textContent=first==null?"0":(1/(first+1)).toFixed(2).replace(".",",");
+    $("#m-explain").textContent=total?`${inK} de ${total} relevantes estão no top-${k}. O primeiro relevante está na posição ${first==null?"(nenhuma)":first+1}, por isso RR = ${first==null?"0":"1/"+(first+1)}. O MRR seria a média deste valor sobre todas as perguntas do conjunto.`:"Marca pelo menos um resultado como relevante, ou indica relevantes que ficaram de fora.";
+  }
+  $("#m-miss").addEventListener("input",draw);draw();
+  function nq(){const n=+$("#n-q").value;$("#o-nq").textContent=n;
+    $("#nq-text").innerHTML=`Com <b>${n}</b> perguntas, cada pergunta vale <b>${(1/n).toFixed(3).replace(".",",")}</b> no Recall médio. Duas configurações que diferem em ${(1/n).toFixed(3).replace(".",",")} diferem numa única pergunta: isso não é uma tendência. Quando avaliamos um sistema com poucas perguntas, uma única pergunta pode alterar bastante o resultado final. Por isso, não devemos concluir demasiado com base numa amostra pequena. Para conclusões fiáveis, usem conjuntos maiores e olhem para as perguntas que mudaram.`;}
+  $("#n-q").addEventListener("input",nq);nq();
+})();
+
+/* 06 · BM25 */
+(function(){
+  const svg=$("#bm-svg"),W=720,H=250,L=48,R=20,T=16,B=36,FM=15;
+  function draw(){
+    const k1=+$("#k1").value,b=+$("#bb").value,ld=+$("#ld").value;
+    $("#o-k1").textContent=k1.toFixed(1).replace(".",",");$("#o-b").textContent=b.toFixed(2).replace(".",",");$("#o-ld").textContent=ld.toFixed(2).replace(".",",");
+    const f=x=>x*(k1+1)/(x+k1*(1-b+b*ld));const ymax=Math.max(4,Math.ceil(k1+1));
+    const X=v=>L+v/FM*(W-L-R),Y=v=>T+(1-v/ymax)*(H-T-B);
+    clear(svg);
+    for(let v=0;v<=ymax;v++){el("line",{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:"var(--line)"},svg);el("text",{x:L-8,y:Y(v)+4,"text-anchor":"end","font-size":12,fill:"var(--muted)"},svg,v);}
+    [0,5,10,15].forEach(v=>el("text",{x:X(v),y:H-12,"text-anchor":"middle","font-size":12,fill:"var(--muted)"},svg,v));
+    el("text",{x:W-R,y:H-12,"text-anchor":"end","font-size":12,fill:"var(--muted)"},svg,"ocorrências da palavra no documento →");
+    el("line",{x1:X(0),y1:Y(0),x2:X(Math.min(FM,ymax)),y2:Y(Math.min(FM,ymax)),stroke:"var(--muted)","stroke-dasharray":"5 5","stroke-width":1.5},svg);
+    let d="";for(let i=0;i<=150;i++){const x=i/10;d+=(i?"L":"M")+X(x).toFixed(1)+" "+Y(f(x)).toFixed(1);}
+    el("path",{d,fill:"none",stroke:"var(--c1)","stroke-width":3},svg);
+    el("line",{x1:L,x2:W-R,y1:Y(k1+1),y2:Y(k1+1),stroke:"var(--c1)","stroke-dasharray":"2 4"},svg);
+    el("text",{x:W-R,y:Y(k1+1)-6,"text-anchor":"end","font-size":12,fill:"var(--c1)"},svg,"teto = k1 + 1");
+  }
+  ["#k1","#bb","#ld"].forEach(s=>$(s).addEventListener("input",draw));draw();
+  const STOP=new Set("a o os as de da do das dos e em um uma uns umas para por com que qual quais quem como no na nos nas ao aos se eu me meu minha posso pode quanto quanta quantos quantas onde quando sao ser ha".split(" "));
+  const norm=s=>s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"");
+  const bs=$("#tk-stop"),bm=$("#tk-stem");
+  [bs,bm].forEach(b=>b.addEventListener("click",()=>{b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"));tok();}));
+  function tok(){const raw=norm($("#tk-in").value).match(/[a-z0-9]+(?:-[a-z0-9]+)*/g)||[];
+    const st=bs.getAttribute("aria-pressed")==="true",sm=bm.getAttribute("aria-pressed")==="true";
+    $("#tk-out").innerHTML=raw.map(t=>{const off=st&&STOP.has(t);let s=t;if(sm&&!off&&s.length>4)s=s.replace(/(oes|aes|ais|eis|res|ns|s)$/,m=>({oes:"ao",aes:"ao",ais:"al",eis:"el",res:"r",ns:"m",s:""})[m]);
+      return `<span class="tok${off?" off":""}">${s}</span>`;}).join("")+`<p class="note" style="margin-top:8px">${raw.filter(t=>!(st&&STOP.has(t))).length} termos chegam ao índice.</p>`;}
+  $("#tk-in").addEventListener("input",tok);tok();
+})();
+
+/* 07 · RRF */
+(function(){
+  const dense=["Cancelamento","Reembolso","Inscrição","Preçário 2026","Balneários"];
+  const bm=["Preçário 2026","Cancelamento","Mensalidades","Reembolso","Contactos"];
+  $("#l-dense").innerHTML=dense.map(d=>`<li>${d}</li>`).join("");$("#l-bm").innerHTML=bm.map(d=>`<li>${d}</li>`).join("");
+  function draw(){const k=+$("#rrf-k").value;$("#o-rrfk").textContent=k;const s={};
+    [dense,bm].forEach(l=>l.forEach((d,i)=>{s[d]=(s[d]||0)+1/(k+i+1);}));
+    const r=Object.entries(s).sort((a,b)=>b[1]-a[1]);
+    $("#l-rrf tbody").innerHTML=r.map(([d,v],i)=>`<tr><td class="num" style="text-align:left;width:28px">${i+1}</td><td>${i<3?"<b>"+d+"</b>":d}</td><td class="num">${v.toFixed(4).replace(".",",")}</td></tr>`).join("");}
+  $("#rrf-k").addEventListener("input",draw);draw();
+})();
+
+/* 08 · funil */
+(function(){
+  const svg=$("#funnel-svg");
+  function draw(){const n=+$("#f-n").value;$("#o-fn").textContent=n;clear(svg);
+    const stages=[["Coleção","10 000 excertos",700],["1.ª fase · bi-encoder / BM25",n+" candidatos",Math.max(140,700*Math.log10(n)/4)],["2.ª fase · cross-encoder","top-5 para o LLM",120]];
+    stages.forEach(([a,b,w],i)=>{const y=8+i*46;el("rect",{x:(720-w)/2,y,width:w,height:36,rx:6,fill:i===2?"var(--accent)":i===1?"var(--accent-soft)":"var(--sunk)",stroke:"var(--line)"},svg);
+      el("text",{x:360,y:y+23,"text-anchor":"middle","font-size":13,fill:i===2?"var(--surface)":"var(--ink)","font-weight":600},svg,a+" · "+b);});
+    const ms=5+3*n;el("text",{x:716,y:146,"text-anchor":"end","font-size":12.5,fill:"var(--muted)"},svg,`≈ ${ms} ms por pergunta (${Math.round(3*n/ms*100)}% no reranker)`);}
+  $("#f-n").addEventListener("input",draw);draw();
+})();
+
+/* 09 · versões */
+(function(){
+  const V=[["2025-01-10","Preçário 2025","precos"],["2025-09-01","Aulas de grupo","aulas"],["2026-01-08","Preçário 2026","precos"],["2024-03-02","Regras do balneário (v1)","balneario"],["2026-02-15","Regras do balneário (v2)","balneario"]];
+  const box=$("#versions"),btn=$("#v-btn");let on=false;
+  function draw(){const latest={};V.forEach(([d,,t])=>{if(!latest[t]||d>latest[t])latest[t]=d;});
+    box.innerHTML=V.map(([d,n,t])=>`<div class="ver${on&&d!==latest[t]?" out":""}"><span class="d">${d}</span><span>${n}</span><span class="note" style="margin-left:auto">tópico: ${t}</span></div>`).join("");
+    btn.textContent=on?"Remover filtro":"Aplicar filtro";btn.setAttribute("aria-pressed",String(on));}
+  btn.addEventListener("click",()=>{on=!on;draw();});draw();
+})();
+
+/* 10 · matriz */
+(function(){
+  const T=["<b>Ideal.</b> “A mensalidade é de 28 euros e inclui a piscina [gin-precos-2026].” Certa e cada afirmação vem do excerto citado.",
+  "<b>Certa por sorte.</b> “As aulas de pilates são às 19h00.” O excerto recuperado não fala de pilates; o modelo acertou com conhecimento próprio ou por palpite. Hoje acerta, amanhã inventa.",
+  "<b>Recuperação falhou.</b> “A mensalidade é de 25 euros [gin-precos-2025].” Fiel ao excerto, mas o excerto estava desatualizado. O problema está antes do modelo: filtros e recuperação.",
+  "<b>Alucinação.</b> “O cancelamento dá direito a reembolso total.” Nem está nos excertos nem é verdade. É o pior caso, e o que a abstenção e a verificação de citações tentam evitar."];
+  const cells=[...document.querySelectorAll("#matrix .cell")];
+  cells.forEach(c=>c.addEventListener("click",()=>{cells.forEach(x=>x.style.outline="");c.style.outline="2px solid var(--accent)";$("#matrix-text").innerHTML=T[+c.dataset.c];}));
+  cells[0].click();
+})();
+})();
+</script>
+<script>
+/* 05b · exemplo de MRR resolvido à mão */
+(function(){
+  const $=s=>document.querySelector(s), NS="http://www.w3.org/2000/svg";
+  const fmt=x=>x.toFixed(2).replace(".",",");
+  const Q=[{q:"Q1 · A que horas abre a piscina ao domingo?",d:"Horários da piscina"},
+           {q:"Q2 · Posso cancelar a inscrição a meio do mês?",d:"Art. 6.º Cancelamento"},
+           {q:"Q3 · Quanto custa uma aula de grupo avulsa?",d:"Preçário 2026"}];
+  const SYS={A:{name:"Sistema A · só pesquisa densa",pos:[1,4,5]},B:{name:"Sistema B · densa + reranking",pos:[1,1,2]}};
+  let step=0,fail=false;
+  const STEPS=["1 · Dados","2 · Posições","3 · RR","4 · Média","5 · E o Recall@5?"];
+  const SAY=[
+    "Cada linha é uma pergunta e cada quadrado uma posição do top-5 devolvido. O quadrado com ✓ marca o excerto relevante (identificado à mão no conjunto de avaliação). Antes de fazer contas, qual dos sistemas parece melhor?",
+    "Para cada pergunta, procura-se o <b>primeiro</b> relevante e anota-se a sua posição. Se não aparecer no top-5, anota-se “—”.",
+    "O RR (Reciprocal Rank) de cada pergunta é 1 / posição: 1.º lugar vale 1, 2.º vale 1/2, 4.º vale 1/4, 5.º vale 1/5. Sem relevante, RR = 0.",
+    "O MRR (Mean Reciprocal Rank) é a média dos RR sobre as perguntas. Somam-se os valores de cada coluna e divide-se por 3.",
+    "Os dois sistemas encontram o relevante no top-5 das três perguntas, por isso têm o <b>mesmo Recall@5</b>. Só o MRR mostra que o sistema B o coloca muito mais cedo, o que conta num RAG: o modelo recebe poucos excertos e dá mais peso aos primeiros."];
+  const posOf=(s,i)=>(s==="A"&&i===2&&fail)?null:SYS[s].pos[i];
+  const rr=p=>p?1/p:0;
+  const frac=p=>p==null?"0":p===1?"1":"1/"+p;
+  const seg=$("#mrr-steps");
+  const btns=STEPS.map((t,i)=>{const b=document.createElement("button");b.textContent=t;b.addEventListener("click",()=>{step=i;draw();});seg.appendChild(b);return b;});
+  $("#mrr-fail").addEventListener("click",e=>{fail=!fail;e.currentTarget.setAttribute("aria-pressed",String(fail));draw();});
+  function draw(){
+    btns.forEach((b,i)=>b.setAttribute("aria-pressed",String(i===step)));
+    let say=SAY[step];
+    if(fail&&step>=2) say+=" <b>Com a falha:</b> a Q3 do sistema A passa a RR = 0 e o MRR de A desce de 0,48 para (1 + 0,25 + 0)/3 = 0,42; o Recall@5 de A desce para 2/3 = 0,67.";
+    $("#mrr-say").innerHTML=say;
+    const wrap=$("#mrr-sys");wrap.innerHTML="";
+    ["A","B"].forEach(s=>{
+      const box=document.createElement("div");box.className="mrr-sys";
+      box.innerHTML=`<h3>${SYS[s].name}</h3>`;
+      Q.forEach((q,i)=>{const p=posOf(s,i);
+        const row=document.createElement("div");row.className="mrr-row";
+        const cells=Array.from({length:5},(_,j)=>{const hit=p===j+1;return `<i class="${hit?"hit"+(step>=1?" first":""):""}" title="${hit?q.d:"não relevante"}">${hit?"✓":j+1}</i>`;}).join("");
+        row.innerHTML=`<span>${q.q}</span><span class="cells${p?"":" none"}" aria-label="${p?"relevante na posição "+p:"relevante fora do top-5"}">${cells}</span>`;
+        box.appendChild(row);});
+      wrap.appendChild(box);});
+    const body=$("#mrr-body");body.innerHTML="";
+    const cell=(v,show)=>`<td class="num${show?"":" pend"}">${show?v:"?"}</td>`;
+    Q.forEach((q,i)=>{const a=posOf("A",i),b=posOf("B",i);
+      body.insertAdjacentHTML("beforeend",`<tr><td>${q.q.split(" · ")[0]}</td>${cell(a??"—",step>=1)}${cell(frac(a)+" = "+fmt(rr(a)),step>=2)}${cell(b??"—",step>=1)}${cell(frac(b)+" = "+fmt(rr(b)),step>=2)}</tr>`);});
+    const m=s=>{const v=[0,1,2].map(i=>rr(posOf(s,i)));return {v,avg:v.reduce((x,y)=>x+y,0)/3};};
+    ["a","b"].forEach(s=>{const r=m(s.toUpperCase());const el=$("#mrr-"+s);
+      el.className="num"+(step>=3?"":" pend");
+      el.innerHTML=step>=3?`(${r.v.map(fmt).join(" + ")}) / 3 = <b>${fmt(r.avg)}</b>`:"?";
+      const hits=[0,1,2].filter(i=>posOf(s.toUpperCase(),i)).length;const rc=$("#rec-"+s);
+      rc.className="num"+(step>=4?"":" pend");
+      rc.innerHTML=step>=4?`${hits}/3 = <b>${fmt(hits/3)}</b>`:"?";});
+  }
+  /* curva 1/posição */
+  (function(){const svg=$("#rr-svg"),L=34,B=140,W=420,bw=30;
+    const mk=(t,a,txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;};
+    mk("line",{x1:L,x2:W-6,y1:B,y2:B,stroke:"var(--line)"});
+    mk("text",{x:L-6,y:B-100+4,"text-anchor":"end","font-size":11,fill:"var(--muted)"},"1");
+    mk("text",{x:L-6,y:B+4,"text-anchor":"end","font-size":11,fill:"var(--muted)"},"0");
+    for(let r=1;r<=10;r++){const h=100/r,x=L+8+(r-1)*37;
+      mk("rect",{x,y:B-h,width:bw,height:h,rx:3,fill:r===1?"var(--accent)":"var(--c4)"});
+      mk("text",{x:x+bw/2,y:B-h-5,"text-anchor":"middle","font-size":11,fill:"var(--ink)"},fmt(1/r));
+      mk("text",{x:x+bw/2,y:B+15,"text-anchor":"middle","font-size":11,fill:"var(--muted)"},r+".º");}
+    mk("text",{x:W-6,y:166,"text-anchor":"end","font-size":11,fill:"var(--muted)"},"posição do primeiro relevante");
+  })();
+  draw();
+})();
+</script>
+
+</body></html>
